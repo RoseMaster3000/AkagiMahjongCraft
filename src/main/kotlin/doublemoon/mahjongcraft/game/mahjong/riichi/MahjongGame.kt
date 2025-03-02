@@ -1448,7 +1448,16 @@ class MahjongGame(
         realPlayers.forEach { it.gameOver() }
         botPlayers.forEach { //將電腦傳回原本的位置
             it.entity.isInvisible = true
-            it.entity.teleport(tableCenterPos.x, tableCenterPos.y, tableCenterPos.z)
+            val serverWorld = it.entity.world as? ServerWorld
+            it.entity.teleport(
+                serverWorld,
+                tableCenterPos.x,
+                tableCenterPos.y,
+                tableCenterPos.z,
+                setOf(),
+                it.entity.yaw,
+                it.entity.pitch
+            )
         }
         if (sync) syncMahjongTable()  //結束遊戲要同步麻將桌
     }

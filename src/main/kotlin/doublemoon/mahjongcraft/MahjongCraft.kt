@@ -19,7 +19,7 @@ import org.apache.logging.log4j.Logger
 const val MOD_ID = "mahjongcraft"
 val logger: Logger = LogManager.getLogger()  //取得 logger
 
-fun id(path: String): Identifier = Identifier(MOD_ID, path)
+fun id(path: String): Identifier = Identifier.of(MOD_ID, path)
 
 object MahjongCraft : ModInitializer {
 

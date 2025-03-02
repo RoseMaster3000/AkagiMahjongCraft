@@ -32,6 +32,7 @@ data class MahjongTablePayload(
     companion object {
         val ID = CustomPayload.Id<MahjongTablePayload>(id("mahjong_table_payload"))
         val CODEC: PacketCodec<RegistryByteBuf, MahjongTablePayload> =
-            PacketCodec.of(MahjongTablePayload::writeByteBuf, ::MahjongTablePayload)
+            PacketCodec.of({ payload: MahjongTablePayload, buf: RegistryByteBuf -> payload.writeByteBuf(buf) },
+                         { buf: RegistryByteBuf -> MahjongTablePayload(buf) })
     }
 }
