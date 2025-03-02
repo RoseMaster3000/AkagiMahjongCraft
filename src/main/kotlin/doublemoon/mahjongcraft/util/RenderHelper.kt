@@ -13,7 +13,6 @@ import net.minecraft.client.render.LightmapTextureManager
 import net.minecraft.client.render.OverlayTexture
 import net.minecraft.client.render.VertexConsumerProvider
 import net.minecraft.client.render.entity.LivingEntityRenderer
-import net.minecraft.client.render.entity.PlayerModelPart
 import net.minecraft.client.render.item.ItemRenderer
 import net.minecraft.client.render.model.json.ModelTransformationMode
 import net.minecraft.client.util.math.MatrixStack
@@ -115,7 +114,7 @@ object RenderHelper {
     ) {
         val client = MinecraftClient.getInstance()
         val playerEntity = client.world?.getPlayerByUuid(gameProfile.id)
-        val hatVisible = playerEntity != null && playerEntity.isPartVisible(PlayerModelPart.HAT)
+        val hatVisible = false
         val upsideDown = playerEntity != null && LivingEntityRenderer.shouldFlipUpsideDown(playerEntity)
 
         val skinTextures = client.skinProvider.getSkinTextures(gameProfile)
