@@ -17,10 +17,43 @@ val mavenGroup: String by project
 group = mavenGroup
 
 repositories {
+    mavenLocal()
+    mavenCentral()
     maven(url = "https://server.bbkr.space/artifactory/libs-release") { name = "CottonMC" }
     maven(url = "https://jitpack.io")  //Mahjong4j
     maven(url = "https://maven.shedaniel.me/") //Cloth Config
     maven(url = "https://maven.terraformersmc.com/") //Mod Menu
+    maven(url = "https://api.modrinth.com/maven") // modrinth
+
+
+    // Added repositories for LifeSteal depenedencies
+    maven("https://maven.parchmentmc.org")
+    maven {
+        name = "Ladysnake Mods" // Use property assignment for name
+        url = uri("https://maven.ladysnake.org/releases") // Use url = uri(...)
+    }
+    maven("https://jm.gserv.me/repository/maven-public/")
+    maven {
+        name = "Fuzs Mod Resources"
+        url = uri("https://raw.githubusercontent.com/Fuzss/modresources/main/maven/")
+    }
+    // CurseMaven in Kotlin DSL:
+    maven {
+        url = uri("https://www.cursemaven.com")
+        content {
+            includeGroup("curse.maven")
+        }
+    }
+    maven {
+        name = "Jared's maven"
+        url = uri("https://maven.blamejared.com/")
+    }
+    maven {
+        name = "ModMaven"
+        url = uri("https://modmaven.dev")
+    }
+    maven("https://jitpack.io")
+    maven("https://maven.fabricmc.net/")
 }
 
 dependencies {
@@ -47,6 +80,9 @@ dependencies {
     // Mod Menu (https://www.curseforge.com/minecraft/mc-mods/modmenu)
     val modMenuVersion: String by project
     modImplementation("com.terraformersmc:modmenu:$modMenuVersion")
+    // Lifesteal > gradle publishToMavenLocal
+    val lifestealVersion: String by project
+    modImplementation("mc.mian:lifesteal-fabric:$lifestealVersion")
 }
 
 tasks {
