@@ -1,5 +1,17 @@
 # MahjongCraft
-A Fabric Minecraft mod that allows you to play Japanese(Riichi) Mahjong in game, supports multiplayer.
+A Fabric Minecraft mod that allows you to play Japanese (Riichi) Mahjong in game, supports multiplayer.
+
+## RM3 Fork
+* Updated to minecraft 1.21.1
+* unclickable tiles? (Fixed architectury bug?)
+* Removed AI bots
+* Added Lifesteal Integration, hearts are used to buy in, heart fragments are rewarded on cash out
+* 1 heart == 9 fragments == 9000 points (cash out points are rounded to neared fragment)
+* Two Rounds: 3 hearts -> 27,000 points
+* One Round: 2 hearts -> 18,000 points
+* One Hand: 1 heart -> 9,000 points
+* If a player busts, they give as many points as they have and the game immediately ends
+
 
 ## Dependencies
 <div>
@@ -11,8 +23,3 @@ A Fabric Minecraft mod that allows you to play Japanese(Riichi) Mahjong in game,
 - [Fabric Language Kotlin](https://www.curseforge.com/minecraft/mc-mods/fabric-language-kotlin)
 - [Cloth Config API (Fabric)](https://www.curseforge.com/minecraft/mc-mods/cloth-config)
 - [Mod Menu](https://www.curseforge.com/minecraft/mc-mods/modmenu) (Optional)
-
-## Support
-Please report any issues to [the issue tracker](https://github.com/doublemoon1119/MahjongCraft/issues) on Github.
-
-我是臺灣人，除了英文以外你也可用中文發表 [問題](https://github.com/doublemoon1119/MahjongCraft/issues) 或留言
