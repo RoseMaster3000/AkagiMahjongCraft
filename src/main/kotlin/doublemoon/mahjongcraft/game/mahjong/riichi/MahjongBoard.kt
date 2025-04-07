@@ -175,7 +175,9 @@ class MahjongBoard(
         //最後清除掉所有牌的實體
         //有時候會同時觸發遊戲中的清除跟 MahjongGame.onBreak() 或 MahjongGame.onServerStopping() 的清除,
         //會導致有一個 allTiles.clear() 先執行, 後面另外一個正在執行 forEach 的直接報錯, 這裡直接先複製後再執行, 避免上述情況
-        allTiles.toList().forEach { if (!it.isRemoved) it.remove(Entity.RemovalReason.DISCARDED) }
+        allTiles.toList().forEach {
+            if (!it.isRemoved) this.game.removeEntity(it, Entity.RemovalReason.DISCARDED)
+        }
         allTiles.clear()
     }
 
@@ -919,7 +921,7 @@ class MahjongBoard(
     fun removeHonbaSticks(player: MahjongPlayerBase) {
         if (player !in game.seat) return
         player.sticks.filter { it.scoringStick == ScoringStick.P100 }.forEach { //場棒是 100 點棒
-            it.remove(Entity.RemovalReason.DISCARDED)
+            this.game.removeEntity(it, Entity.RemovalReason.DISCARDED)
             player.sticks -= it
         }
         resortSticks(player) //移除完所有場棒, 重新排列一下剩下的積棒

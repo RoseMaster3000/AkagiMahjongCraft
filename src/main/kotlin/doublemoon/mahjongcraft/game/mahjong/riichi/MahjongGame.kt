@@ -26,6 +26,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import net.minecraft.entity.Entity
+import net.minecraft.entity.Entity.RemovalReason
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld
@@ -162,7 +163,7 @@ class MahjongGame(
             if (player is MahjongPlayer) { //是玩家
                 player.sendMessage(PREFIX + Text.translatable("$MOD_ID.game.message.be_kick"))
             } else {  //是機器人, 清掉實體
-                player.entity.remove(Entity.RemovalReason.DISCARDED)
+                removeEntity(player.entity, Entity.RemovalReason.DISCARDED)
             }
         }
     }
@@ -193,13 +194,34 @@ class MahjongGame(
                     players.add(0, this)
                     this.ready = true
                 } else {
-                    botPlayers.forEach { it.entity.remove(Entity.RemovalReason.DISCARDED) } //清掉機器人實體
+                    botPlayers.forEach { botPlayer -> removeEntity(botPlayer.entity, Entity.RemovalReason.DISCARDED) }
                     players.clear()
                 }
             }
         }
         players.removeIf { it.entity == player }
     }
+
+
+    // Thread Safe Entity Removal
+    public fun removeEntity(entity: Entity, reason: Entity.RemovalReason){
+        val serverWorld = this.world // Make sure 'this.world' refers to your game's ServerWorld instance
+        if (!serverWorld.isClient) {
+            val server = serverWorld.server
+            val entityID = entity.id
+            // Schedule the removal task to run on the main server thread
+            server.execute {
+                // This code block will execute during a server tick
+                // Get the world instance safely on the main thread
+                val worldOnMainThread = server.getWorld(serverWorld.registryKey)
+                if (worldOnMainThread != null) {
+                    val entityToRemove = worldOnMainThread.getEntityById(entityID)
+                    entityToRemove?.remove(reason)
+                }
+            }
+        }
+    }
+
 
     /**
      * 清除或重置大部分東西用,
@@ -212,7 +234,7 @@ class MahjongGame(
             if (clearRiichiSticks) { //如果要清理立直棒
                 it.sticks.filter { stick -> stick.scoringStick == ScoringStick.P1000 }
                     .forEach { stick ->
-                        stick.remove(Entity.RemovalReason.DISCARDED)
+                        removeEntity(stick, Entity.RemovalReason.DISCARDED)
                         it.sticks -= stick
                     }
             }
@@ -276,7 +298,8 @@ class MahjongGame(
             delayOnServer(500)
 
             //清除擲出的骰子
-            dices.forEach { it.remove(Entity.RemovalReason.DISCARDED) }
+            dices.forEach { diceEntity -> removeEntity(diceEntity, Entity.RemovalReason.DISCARDED) }
+
             delayOnServer(1000)
 
             var nextPlayer: MahjongPlayerBase = dealer //莊家開始打牌
@@ -1474,8 +1497,8 @@ class MahjongGame(
         realPlayers.forEach { //傳給玩家->麻將桌被破壞的訊息
             it.sendMessage(message)
         }
-        botPlayers.forEach {  //將電腦從遊戲中移除
-            it.entity.remove(Entity.RemovalReason.DISCARDED)
+        botPlayers.forEach {  //Remove the bot from the game
+            removeEntity(it.entity, Entity.RemovalReason.DISCARDED)
         }
         players.clear()
         GameManager.games -= this

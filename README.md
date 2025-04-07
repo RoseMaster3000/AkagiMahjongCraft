@@ -3,7 +3,7 @@ A Fabric Minecraft mod that allows you to play Japanese (Riichi) Mahjong in game
 
 ## RM3 Fork
 * Updated to minecraft 1.21.1
-* unclickable tiles? (Fixed architectury bug?)
+* fixed conflict with c2me (thread unsafe entity removals were replaced)
 * Removed AI bots
 * Added Lifesteal Integration, hearts are used to buy in, heart fragments are rewarded on cash out
 * 1 heart == 9 fragments == 9000 points (cash out points are rounded to neared fragment)
