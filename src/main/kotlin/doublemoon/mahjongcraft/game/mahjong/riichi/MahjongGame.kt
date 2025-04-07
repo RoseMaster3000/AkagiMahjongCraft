@@ -43,7 +43,7 @@ import net.minecraft.util.math.Vec3d
 import org.mahjong4j.PersonalSituation
 import org.mahjong4j.hands.Kantsu
 import kotlin.math.abs
-
+import mc.mian.lifesteal.api.PlayerImpl
 /**
  * 日本麻將的主要實現都在這, 允許食斷
  *
@@ -152,6 +152,15 @@ class MahjongGame(
      * */
     fun readyOrNot(player: ServerPlayerEntity, ready: Boolean) {
         getPlayer(player)?.ready = ready
+//        val lsPlayer = player as? PlayerImpl
+//        if (lsPlayer!=null){
+//            if (ready) {
+//                lsPlayer.sendScreenMessage("You are a gambler")
+//            }
+//            else {
+//                lsPlayer.sendScreenMessage("You are a bitch")
+//            }
+//        }
     }
 
     /**

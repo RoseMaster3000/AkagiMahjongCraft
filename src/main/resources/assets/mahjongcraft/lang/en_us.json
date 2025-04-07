@@ -150,6 +150,7 @@
   "mahjongcraft.game.message.already_in_a_game": "You are already in a game",
   "mahjongcraft.game.message.already_started": "This game has already started",
   "mahjongcraft.game.message.be_kick": "You were kicked by the game host",
+  "mahjongcraft.game.message.cannot_break_during_game": "You can not destroy a table while a game is being played",
   "mahjongcraft.game.message.game_block_is_destroyed": "The game block is destroyed",
   "mahjongcraft.game.message.you_changed_the_rules": "You changed the rules",
   "mahjongcraft.game.message.host_changed_the_rules": "The host has changed the rules, please review the rules again and get ready for the game",

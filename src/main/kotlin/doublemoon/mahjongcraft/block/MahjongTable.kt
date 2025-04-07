@@ -75,7 +75,23 @@ class MahjongTable(settings: Settings) : BlockWithEntity(settings) {
         if (!world.isClient) {
             val part = state[PART] ?: return super.onBreak(world, pos, state, player)
             val centerPos = getCenterPosByPart(pos, part)
-            //確保打掉桌子的其中一格方塊就能拆掉整張桌子
+            val serverWorld = world as ServerWorld // Cast here as GameManager and game logic require ServerWorld
+
+            // --- Indestructibility Check ---
+            val game = GameManager.getGame<MahjongGame>(world = serverWorld, pos = centerPos)
+            if (game != null && game.status == GameStatus.PLAYING) {
+                // Game is in progress, prevent breaking
+                if (player is ServerPlayerEntity) {
+                    // Send a message to the player (optional, but good feedback)
+                    player.sendMessage(
+                        Text.translatable("$MOD_ID.game.message.cannot_break_during_game").formatted(Formatting.RED),
+                        true // Send to action bar
+                    )
+                }
+                return state // Return the original state to prevent the block from being broken
+            }
+
+            // Make sure you knock out one of the table's squares to demolish the entire table.
             allPos(centerPos).forEach { blockPos ->
                 val blockState = world.getBlockState(blockPos)
                 if (blockState.block != this) return@forEach
