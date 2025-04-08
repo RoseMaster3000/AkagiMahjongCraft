@@ -50,6 +50,7 @@ class RuleEditorGui(
         val values = MahjongRule.GameLength.entries.toTypedArray()
         val nextValue = values[(editingRule.length.ordinal + 1) % values.size]
         editingRule.length = nextValue
+        editingRule.startingPoints = editingRule.length.startingPoints
     }
     private val thinkingTimeItem = RuleSelectItem(
         name = Text.translatable("$MOD_ID.game.thinking_time"),
@@ -61,22 +62,7 @@ class RuleEditorGui(
         val nextValue = values[(editingRule.thinkingTime.ordinal + 1) % values.size]
         editingRule.thinkingTime = nextValue
     }
-    private val startingPointsItem = RuleIntegerTextFieldItem(
-        name = Text.translatable("$MOD_ID.game.starting_points"),
-        description = arrayOf(
-            Text.translatable(
-                "mahjongcraft.game.starting_points.description",
-                MahjongRule.MIN_POINTS,
-                MahjongRule.MAX_POINTS
-            )
-        ),
-        defaultValue = editingRule.startingPoints
-    )
-    private val minPointsToWinItem = RuleIntegerTextFieldItem(
-        name = Text.translatable("$MOD_ID.game.min_points_to_win"),
-        description = arrayOf(Text.translatable("$MOD_ID.game.min_points_to_win.description")),
-        defaultValue = editingRule.minPointsToWin
-    )
+
     private val minimumHanItem = RuleSelectItem(
         name = Text.translatable("$MOD_ID.game.minimum_han"),
         value = { editingRule.minimumHan },
@@ -108,29 +94,9 @@ class RuleEditorGui(
         onClick = { editingRule.openTanyao = it }
     )
 
-    //這兩個是檢查用的
-    private val startingPointsItemValueInvalid: Boolean
-        get() {
-            val intValue = startingPointsItem.value
-            return intValue == null || intValue > MahjongRule.MAX_POINTS || intValue < MahjongRule.MIN_POINTS
-        }
-    private val minPointsToWinItemValueInvalid: Boolean
-        get() {
-            val intValue = minPointsToWinItem.value
-            return if (intValue == null || intValue > MahjongRule.MAX_POINTS || intValue < MahjongRule.MIN_POINTS) true
-            else {
-                val startingPointValue = startingPointsItem.value
-                val biggerOrEqualStartingPoint =
-                    if (startingPointValue == null) true else intValue >= startingPointValue
-                !biggerOrEqualStartingPoint
-            }
-        }
-
     private val items = listOf(
         lengthItem,
         thinkingTimeItem,
-        startingPointsItem,
-        minPointsToWinItem,
         minimumHanItem,
         spectateItem,
         redFiveItem,
@@ -185,27 +151,12 @@ class RuleEditorGui(
     }
 
     fun tick() {
-        startingPointsItem.apply {
-            hint = if (startingPointsItemValueInvalid) {
-                Text.translatable("$MOD_ID.gui.invalid_value").formatted(Formatting.RED)
-            } else {
-                Text.of("")
-            }
-        }
-        minPointsToWinItem.apply {
-            hint = if (minPointsToWinItemValueInvalid) {
-                Text.translatable("$MOD_ID.gui.invalid_value").formatted(Formatting.RED)
-            } else {
-                Text.of("")
-            }
-        }
         confirm.isEnabled = confirmEnabled
         apply.isEnabled = confirm.isEnabled
     }
 
     private val confirmEnabled: Boolean
         get() {
-            if (startingPointsItemValueInvalid || minPointsToWinItemValueInvalid) return false
             val origin = mahjongTable.rule
             val lengthDiff = origin.length != editingRule.length
             val thinkingTimeDiff = origin.thinkingTime != editingRule.thinkingTime
@@ -213,14 +164,10 @@ class RuleEditorGui(
             val spectateDiff = origin.spectate != editingRule.spectate
             val redFiveDiff = origin.redFive != editingRule.redFive
             val openTanyaoDiff = origin.openTanyao != editingRule.openTanyao
-            val startingPointsDiff = origin.startingPoints != startingPointsItem.value!!
-            val minPointsToWinDiff = origin.minPointsToWin != minPointsToWinItem.value!!
-            return lengthDiff || thinkingTimeDiff || minimumHanDiff || spectateDiff || redFiveDiff || openTanyaoDiff || startingPointsDiff || minPointsToWinDiff
+            return lengthDiff || thinkingTimeDiff || minimumHanDiff || spectateDiff || redFiveDiff || openTanyaoDiff
         }
 
     private fun apply() {
-        editingRule.startingPoints = startingPointsItem.value!!
-        editingRule.minPointsToWin = minPointsToWinItem.value!!
         sendPayloadToServer(
             payload = MahjongTablePayload(
                 behavior = MahjongTableBehavior.CHANGE_RULE,

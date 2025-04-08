@@ -151,16 +151,28 @@ class MahjongGame(
      * 讓玩家準備 or 取消準備
      * */
     fun readyOrNot(player: ServerPlayerEntity, ready: Boolean) {
-        getPlayer(player)?.ready = ready
-//        val lsPlayer = player as? PlayerImpl
-//        if (lsPlayer!=null){
-//            if (ready) {
-//                lsPlayer.sendScreenMessage("You are a gambler")
-//            }
-//            else {
-//                lsPlayer.sendScreenMessage("You are a bitch")
-//            }
-//        }
+        val currentPlayer = getPlayer(player) ?: return
+        currentPlayer.ready = ready
+
+
+        try {
+            val playerImpl = currentPlayer as PlayerImpl
+            if (ready) {
+                playerImpl.sendScreenMessage("You are a gambler")
+            }
+            else {
+                playerImpl.sendScreenMessage("You are a bitch")
+            }
+
+        } catch (e: LinkageError) {
+            // Catch errors if the Lifesteal mod/API isn't present or compatible
+            logger.warn("Lifesteal API interaction failed (LinkageError) for player ${player.name.string}. Is the Lifesteal mod installed and compatible? Error: ${e.message}")
+        } catch (e: Exception) {
+            // Catch other potential exceptions during API interaction
+            logger.error("Failed to send screen message via Lifesteal API for player ${player.name.string}: ${e.message}", e)
+            // You could add a fallback message to the player if desired:
+            // player.sendMessage(Text.literal("Error interacting with Lifesteal API."), false)
+        }
     }
 
     /**
@@ -183,8 +195,19 @@ class MahjongGame(
      * */
     override fun join(player: ServerPlayerEntity) {
         if (GameManager.isInAnyGame(player) || isInGame(player)) return
+
         players += MahjongPlayer(entity = player)
-        if (isHost(player)) players[0].ready = true
+        if (isHost(player)){
+            players[0].ready = true
+            try {
+                val lsPlayer = player as? PlayerImpl;
+                lsPlayer?.sendScreenMessage("You are a gambler")
+            } catch (e: LinkageError) {
+                logger.warn("Lifesteal API interaction failed (LinkageError) for player ${player.name.string}. Is the Lifesteal mod installed and compatible? Error: ${e.message}")
+            } catch (e: Exception) {
+                logger.error("Failed to send screen message via Lifesteal API for player ${player.name.string}: ${e.message}", e)
+            }
+        }
     }
 
     /**
@@ -196,8 +219,6 @@ class MahjongGame(
         if (!GameManager.isInAnyGame(player) || !isInGame(player)) return
         if (isHost(player)) { //如果玩家是 host
             players.find { it is MahjongPlayer && it.entity != player }.apply {
-                //找到第一個 不是機器人(即 MahjongPlayer) 也不是當前 host 的玩家, 讓他成為 host
-                //否則全都是機器人, 清空玩家
                 if (this != null) {
                     players.remove(this)
                     players.add(0, this)

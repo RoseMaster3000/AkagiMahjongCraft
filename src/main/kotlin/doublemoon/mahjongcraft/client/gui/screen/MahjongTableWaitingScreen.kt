@@ -18,6 +18,7 @@ import io.github.cottonmc.cotton.gui.widget.data.VerticalAlignment
 import net.fabricmc.api.EnvType
 import net.fabricmc.api.Environment
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.network.ClientPlayerEntity
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.text.Text
@@ -25,23 +26,19 @@ import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
 import java.util.*
 
+
 @Environment(EnvType.CLIENT)
 class MahjongTableWaitingScreen(
     mahjongTable: MahjongTableBlockEntity,
 ) : CottonClientScreen(MahjongTableGui(mahjongTable)) {
-    /**
-     * 不取消暫停的話, 通過按按鈕導致的更新會卡在下個 tick, 畫面會更新不了
-     * */
+
     override fun shouldPause(): Boolean = false
 
-    /**
-     * 刷新用, 在 [MahjongTableBlockEntity.readNbt] 的時候刷新,
-     * 確保存在 [MahjongTableBlockEntity] 的資料能夠同步到 GUI 上
-     * */
     fun refresh() {
         (description as MahjongTableGui).refresh()
     }
 }
+
 
 @Environment(EnvType.CLIENT)
 class MahjongTableGui(
@@ -85,9 +82,17 @@ class MahjongTableGui(
     private lateinit var joinOrLeave: WButton
     private var readyOrNot: WButton? = null
     private var start: WTooltipButton? = null
-    private var addBot: WButton? = null
     private var editRules: WButton? = null
     private val kick: MutableList<WButton?> = mutableListOf(null, null, null)  //最多三個, 房主不能踢自己
+
+    private fun formatStartingPointsText(originalText: Text, rule: MahjongRule): Text {
+        val points = rule.startingPoints
+        // Using integer division for buy-in calculation
+        val buyIn = points / 9000
+        // Append the buy-in text to the original text. Use copy() for immutability if originalText might be used elsewhere.
+        // Apply formatting (e.g., GOLD color) to the appended part.
+        return originalText.copy().append(Text.literal(" ($buyIn ♥ buy in)").formatted(Formatting.RED))
+    }
 
     init {
         rootPlainPanel(width = ROOT_WIDTH, height = ROOT_HEIGHT) {
@@ -139,36 +144,40 @@ class MahjongTableGui(
                 width = 140,
                 height = ROOT_HEIGHT - 14 * 2
             ) {
-                rule.toTexts(
+                // --- Filtering Logic ---
+                val originalRuleTextsList = rule.toTexts(
                     color2 = if (!darkMode) Formatting.DARK_GRAY else Formatting.YELLOW,
                     color3 = if (!darkMode) Formatting.DARK_PURPLE else Formatting.GREEN,
                     color4 = if (!darkMode) Formatting.LIGHT_PURPLE else Formatting.AQUA,
                     color5 = if (!darkMode) Formatting.DARK_GRAY else Formatting.WHITE
-                ).forEachIndexed { index, text ->
-                    val y = if (index > 0) ruleTexts[index - 1].let { it.y + it.height } + 3 else 0
-                    ruleTexts += when (index) {
-                        3 -> tooltipText( //起始點數
+                )
+                // Filter out the item originally at index 4
+                val visibleRuleTextsList = originalRuleTextsList.filterIndexed { index, _ -> index != 4 }
+                // Store the original starting points text to identify it after filtering
+                val startingPointsText = originalRuleTextsList.getOrNull(3)
+                // --- End Filtering Logic ---
+
+                visibleRuleTextsList.forEachIndexed { visibleIndex, text -> // <-- Iterate filtered list
+                    // Calculate y based on the *last added widget* in ruleTexts list
+                    val y = if (visibleIndex > 0) ruleTexts[visibleIndex - 1].let { it.y + it.height } + 3 else 0
+
+                    // Create widget based on whether it's the starting points text
+                    val widget = if (text == startingPointsText) { // Check if it's the original starting points text
+                        tooltipText( // 起始點數
                             x = 0,
                             y = y,
                             width = 132,
-                            text = text,
+                            text = formatStartingPointsText(text, rule),
                             tooltip = arrayOf(
-                                Text.translatable(
-                                    "$MOD_ID.game.starting_points.description",
-                                    MahjongRule.MIN_POINTS,
-                                    MahjongRule.MAX_POINTS
-                                )
+                                Text.translatable("$MOD_ID.game.starting_points.description")
                             )
                         )
-                        4 -> tooltipText( //一位必要點數
-                            x = 0,
-                            y = y,
-                            width = 132,
-                            text = text,
-                            tooltip = arrayOf(Text.translatable("$MOD_ID.game.min_points_to_win.description"))
-                        )
-                        else -> text(x = 0, y = y, width = 132, text = text)
+                    } else { // All other visible texts
+                        text(x = 0, y = y, width = 132, text = text)
                     }
+                    ruleTexts += widget // Add the created widget to our list
+                    // Explicitly add the widget to the panel inside the scrollPanel
+                    this.add(widget, widget.x, widget.y, widget.width, widget.height)
                 }
             }
         }
@@ -191,20 +200,38 @@ class MahjongTableGui(
             it.ready = ready[it.number]
             it.fresh()
         }
-        rule.toTexts(
+        // --- Filtering Logic ---
+        val originalRuleTextsList = rule.toTexts(
             color2 = if (!darkMode) Formatting.DARK_GRAY else Formatting.YELLOW,
             color3 = if (!darkMode) Formatting.DARK_PURPLE else Formatting.GREEN,
             color4 = if (!darkMode) Formatting.LIGHT_PURPLE else Formatting.AQUA,
             color5 = if (!darkMode) Formatting.DARK_GRAY else Formatting.WHITE
-        ).forEachIndexed { index, text ->
-            ruleTexts[index].also {
-                it.text = text
-                val y = if (index > 0) {
-                    ruleTexts[index - 1].let { wText -> wText.y + wText.height } + 3
+        )
+        // Filter out the item originally at index 4
+        val visibleRuleTextsList = originalRuleTextsList.filterIndexed { index, _ -> index != 4 }
+        val startingPointsText = originalRuleTextsList.getOrNull(3)
+
+        if (ruleTexts.size != visibleRuleTextsList.size) {
+            System.err.println("Rule text count mismatch in MahjongTableGui refresh!")
+            // Potentially add logic here to clear and rebuild ruleTexts if needed
+            return // Avoid IndexOutOfBounds errors
+        }
+
+        visibleRuleTextsList.forEachIndexed { visibleIndex, text -> // <-- Iterate filtered list
+            ruleTexts[visibleIndex].also { widget -> // <-- Use visibleIndex and get widget
+                // Check if this widget corresponds to starting points text
+                if (text == startingPointsText) {
+                    widget.text = formatStartingPointsText(text, rule) // <-- Use helper function
+                } else {
+                    widget.text = text // <-- Use the standard text for other rules
+                }
+                // --- Calculate Y position ---
+                val y = if (visibleIndex > 0) {
+                    ruleTexts[visibleIndex - 1].let { wText -> wText.y + wText.height } + 3
                 } else {
                     0
                 }
-                it.setLocation(0, y)
+                widget.setLocation(0, y)
             }
         }
         when {
@@ -235,35 +262,12 @@ class MahjongTableGui(
                         }
                     }
                 }
-                if (addBot == null) {
-                    addBot = WButton(Text.translatable("$MOD_ID.gui.button.add_bot"))
-                    (rootPanel as WPlainPanel).add(
-                        addBot,
-                        start!!.x,
-                        start!!.y - BUTTON_HEIGHT - BUTTON_PADDING,
-                        BUTTON_WIDTH,
-                        BUTTON_HEIGHT
-                    )
-                }
-                addBot!!.apply {
-                    isEnabled = !isFull
-                    onClick = Runnable {
-                        if (!isFull && isHost) {
-                            sendPayloadToServer(
-                                payload = MahjongTablePayload(
-                                    behavior = MahjongTableBehavior.ADD_BOT,
-                                    pos = mahjongTable.pos
-                                )
-                            )
-                        }
-                    }
-                }
                 if (editRules == null) {
                     editRules = WButton(Text.translatable("$MOD_ID.gui.button.edit_rules"))
                     (rootPanel as WPlainPanel).add(
                         editRules,
-                        addBot!!.x,
-                        addBot!!.y - BUTTON_HEIGHT - BUTTON_PADDING,
+                        start!!.x,
+                        start!!.y - BUTTON_HEIGHT - BUTTON_PADDING,
                         BUTTON_WIDTH,
                         BUTTON_HEIGHT
                     )
@@ -359,8 +363,6 @@ class MahjongTableGui(
     private fun clearHostButtons() {
         start?.let { rootPanel.remove(it) }
         start = null
-        addBot?.let { rootPanel.remove(it) }
-        addBot = null
         editRules?.let { rootPanel.remove(it) }
         editRules = null
         kick.filterNotNull().forEach { rootPanel.remove(it) }

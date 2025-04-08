@@ -34,13 +34,14 @@ import net.minecraft.util.Formatting
  * */
 @Serializable
 data class MahjongRule(
-    var length: GameLength = GameLength.TWO_WIND,
+    var length: GameLength = GameLength.ONE_HAND,
     var thinkingTime: ThinkingTime = ThinkingTime.NORMAL,
-    var startingPoints: Int = 25000,
-    var minPointsToWin: Int = 30000,
+    var startingPoints: Int = GameLength.ONE_HAND.startingPoints,
+    // If all last, first player will have more than 0 points and game always ends
+    var minPointsToWin: Int = 0,
     var minimumHan: MinimumHan = MinimumHan.ONE,
     var spectate: Boolean = true,
-    var redFive: RedFive = RedFive.NONE,
+    var redFive: RedFive = RedFive.THREE,
     var openTanyao: Boolean = true,
     var localYaku: Boolean = false
 ) {
@@ -115,17 +116,13 @@ data class MahjongRule(
     enum class GameLength(
         private val startingWind: Wind,
         val rounds: Int,
-        val finalRound: Pair<Wind, Int>
+        val finalRound: Pair<Wind, Int>,
+        val startingPoints: Int
     ) : TextFormatting {
-        ONE_GAME(Wind.EAST, 1, Wind.EAST to 3),
-        EAST(Wind.EAST, 4, Wind.SOUTH to 3),
-        SOUTH(Wind.SOUTH, 4, Wind.WEST to 3),
-        TWO_WIND(Wind.EAST, 8, Wind.WEST to 3);
-//        FOUR_WIND(Wind.EAST, 16, "game.$MOD_ID.mahjong.length.four_wind");
+        ONE_HAND(Wind.EAST, 1, Wind.EAST to 3, 9000),
+        ONE_ROUND(Wind.EAST, 4, Wind.SOUTH to 3, 18000),
+        TWO_ROUNDS(Wind.EAST, 8, Wind.WEST to 3, 27000);
 
-        /**
-         * 取得開始遊戲的回合
-         * */
         fun getStartingRound(): MahjongRound = MahjongRound(wind = startingWind)
 
         override fun toText() = Text.translatable("$MOD_ID.game.length.${name.lowercase()}")
