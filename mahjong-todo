@@ -1,0 +1,12 @@
+fun readyOrNot      non-host ready up (take hearts / GATEKEEP)
+                    non-host ready down (refund heart)
+
+fun join
+    isHost          host (take hearts / GATEKEEP)
+
+fun leave
+    isHost          host (take hearts)
+
+
+fun changeRules     host (take hearts / refund hearts / GATEKEEP)
+                    non-host ready down (refund heart)
