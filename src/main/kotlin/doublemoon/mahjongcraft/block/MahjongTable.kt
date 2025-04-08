@@ -75,21 +75,6 @@ class MahjongTable(settings: Settings) : BlockWithEntity(settings) {
         if (!world.isClient) {
             val part = state[PART] ?: return super.onBreak(world, pos, state, player)
             val centerPos = getCenterPosByPart(pos, part)
-            val serverWorld = world as ServerWorld // Cast here as GameManager and game logic require ServerWorld
-
-            // --- Indestructibility Check ---
-            val game = GameManager.getGame<MahjongGame>(world = serverWorld, pos = centerPos)
-            if (game != null && game.status == GameStatus.PLAYING) {
-                // Game is in progress, prevent breaking
-                if (player is ServerPlayerEntity) {
-                    // Send a message to the player (optional, but good feedback)
-                    player.sendMessage(
-                        Text.translatable("$MOD_ID.game.message.cannot_break_during_game").formatted(Formatting.RED),
-                        true // Send to action bar
-                    )
-                }
-                return state // Return the original state to prevent the block from being broken
-            }
 
             // Make sure you knock out one of the table's squares to demolish the entire table.
             allPos(centerPos).forEach { blockPos ->
@@ -99,14 +84,36 @@ class MahjongTable(settings: Settings) : BlockWithEntity(settings) {
                 if (blockPart == MahjongTablePart.BOTTOM_CENTER) {  //center 被破壞時會離開遊戲
                     GameManager.getGame<MahjongGame>(world = world as ServerWorld, pos = centerPos)?.onBreak()
                 }
-                if (blockPart == MahjongTablePart.BOTTOM_CENTER && !player.isCreative) {  //讓玩家在非創造破壞時, 讓中間的桌子掉落
-                    world.breakBlock(blockPos, true)
+                if (blockPart == MahjongTablePart.BOTTOM_CENTER) {
+                    world.breakBlock(blockPos, false)
                 } else {
                     world.breakBlock(blockPos, false)
                 }
             }
+            // Drop this block
+            val itemStack = ItemStack(this.asItem())
+            Block.dropStack(world, centerPos, itemStack)
         }
         return super.onBreak(world, pos, state, player)
+    }
+
+    override fun calcBlockBreakingDelta(
+        state: BlockState,
+        player: PlayerEntity,
+        world: BlockView, // Use BlockView as parameter type, but check if it's ServerWorld inside
+        pos: BlockPos
+    ): Float {
+        // Game state check MUST be done server-side
+        if (world is ServerWorld) {
+            val part = state[PART] ?: MahjongTablePart.BOTTOM_CENTER  // Get part from state
+            val centerPos = getCenterPosByPart(pos, part)             // Find the center
+            val game = GameManager.getGame<MahjongGame>(world = world, pos = centerPos) // Get the game instance
+            if (game != null && game.status == GameStatus.PLAYING) {
+                return 0.0f
+            }
+        }
+
+        return super.calcBlockBreakingDelta(state, player, world, pos)
     }
 
     override fun appendProperties(builder: StateManager.Builder<Block, BlockState>) {
