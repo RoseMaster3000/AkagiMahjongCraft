@@ -42,6 +42,7 @@ import net.minecraft.util.math.MathHelper
 import net.minecraft.util.math.Vec3d
 import org.mahjong4j.PersonalSituation
 import org.mahjong4j.hands.Kantsu
+import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -1395,8 +1396,7 @@ class MahjongGame(
         cancelWaitingBehavior = true
 
         // Hand over money / reset
-        val targetPlayer = world.server.playerManager.getPlayer(this.uuid);
-        val lsPlayer = targetPlayer as PlayerImpl
+        val lsPlayer = this.entity as PlayerImpl
         lsPlayer.giveFragments(this.fragmentPayout)
         this.fragmentPayout = 0
 
@@ -1406,6 +1406,27 @@ class MahjongGame(
             payload = MahjongGamePayload(behavior = MahjongGameBehavior.GAME_OVER)
         )
     }
+
+    private fun playerGameOver(uuid: String, fragments: Int){
+        logger.warn("Trying to give $fragments fragments to $uuid")
+
+        val serverWorld = this.world
+        if (!serverWorld.isClient) {
+            val server = serverWorld.server
+            server.execute {
+                // Get the world instance safely on the main thread
+                val worldOnMainThread = server.getWorld(serverWorld.registryKey)
+                val player = worldOnMainThread?.getPlayerByUuid( UUID.fromString(uuid) )
+                // Player might be offline
+                if (player !=null){
+                    val lsPlayer = player as PlayerImpl
+                    lsPlayer.giveFragments(fragments)
+                    logger.warn("GOOD?: $uuid")
+                }
+            }
+        }
+    }
+
 
     /**
      * 擲骰,
@@ -1581,7 +1602,9 @@ class MahjongGame(
         clearStuffs()
         round = MahjongRound()
         distributeFragments()
-        realPlayers.forEach { it.gameOver() }
+        //realPlayers.forEach { it.gameOver() }
+        realPlayers.forEach { playerGameOver(it.uuid, it.fragmentPayout) }
+
         // Remove all players from game
         botPlayers.forEach { botPlayer -> removeEntity(botPlayer.entity, Entity.RemovalReason.DISCARDED) }
         players.clear()
@@ -1610,34 +1633,10 @@ class MahjongGame(
 
     // player disconnect... just let them keep "auto-discarding"
     override fun onPlayerDisconnect(player: ServerPlayerEntity) {
-        val lsPlayer = player as PlayerImpl
-        lsPlayer.resetJonger()
-
-//        if (isPlaying) {
-//            showGameResult()
-//            end(sync = false)
-//        }
-//        leave(player)
-//        val message = PREFIX + Text.translatable("$MOD_ID.game.message.player_left_game", player.displayName)
-//        realPlayers.forEach { //傳給玩家-> [player] 離開遊戲的訊息
-//            it.sendMessage(message)
-//        }
-//        syncMahjongTable()
     }
 
     // player change world... just let them keep "auto-discarding"/**
     override fun onPlayerChangedWorld(player: ServerPlayerEntity) {
-        //if (isPlaying) {
-        //    showGameResult()
-        //    end(sync = false)
-        //}
-        //leave(player)
-        //val message =
-        //    PREFIX + Text.translatable("$MOD_ID.game.message.player_is_not_in_this_world", player.displayName)
-        //realPlayers.forEach {  //傳給玩家-> [player] 改變世界的訊息
-        //    it.sendMessage(message)
-        //}
-        //syncMahjongTable()
     }
 
     override fun onServerStopping(server: MinecraftServer) {
