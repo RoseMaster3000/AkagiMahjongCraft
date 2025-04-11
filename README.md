@@ -26,8 +26,7 @@ A Fabric Minecraft mod that allows you to play Japanese (Riichi) Mahjong in game
 
 
 ##  Future Ideas
-* If a player disconnects, the game ends BUT the DC player get none of their money (its lost to the void)
-* ???
+* Bring Back Bot button (payout system distrubutes hearts paid in, so bots just count for 0 as is...)
 
 ## Dependencies
 <div>
