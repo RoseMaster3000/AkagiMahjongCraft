@@ -12,7 +12,7 @@ A Fabric Minecraft mod that allows you to play Japanese (Riichi) Mahjong in game
 * Removed call voice sound effects (we use proximity chat)
 * Replaced 1 sou with Philly Eagles (go birds)
 * Removed AI bots (ruins gambling) (might bring this back and just treat bots as 0 weight for cash out?)
-* server sends network payload with a wrapper methods which is more stable (checks if player has reconnected/died/etc)
+* mahjong server sends network payload with a more stable wrapper method (checks if player has reconnected/died/etc)
 
 
 ## Lifesteal Gambling
