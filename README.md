@@ -22,7 +22,7 @@ A Fabric Minecraft mod that allows you to play Japanese (Riichi) Mahjong in game
 * One Round: 2 hearts -> 18,000 points
 * One Hand: 1 heart -> 9,000 points
 * Payments are handed out based on a synthetic total where player that busted are treated as 0's.
-* Weights are calculate from synthetic total ratios, rounding errors are given to first/last place. 
+* Weights are calculate from synthetic total ratios, rounding errors are given to highest point player/ taken from lowest non-zero player. 
 
 
 ##  Future Ideas
