@@ -18,9 +18,9 @@ A Fabric Minecraft mod that allows you to play Japanese (Riichi) Mahjong in game
 ## Lifesteal Gambling
 * Added Lifesteal Integration, hearts are used to buy in, heart fragments are rewarded on cash out
 * 1 heart == 9 fragments == 9000 points (cash out points are rounded to neared fragment)
-* Two Rounds: 3 hearts -> 27,000 points
-* One Round: 2 hearts -> 18,000 points
-* One Hand: 1 heart -> 9,000 points
+* Two Rounds: 3 hearts (27 fragments) -> 27,000 points
+* One Round: 2 hearts (18 fragments) -> 18,000 points
+* One Hand: 1 heart (9 fragments) -> 9,000 points
 * Payments are handed out based on a synthetic total where player that busted are treated as 0's.
 * Weights are calculate from synthetic total ratios, rounding errors are given to highest point player/ taken from lowest non-zero player. 
 
