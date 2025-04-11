@@ -19,7 +19,7 @@ import net.minecraft.text.Text
  * 麻將玩家
  * */
 class MahjongPlayer(
-    override val entity: ServerPlayerEntity,
+    override var entity: ServerPlayerEntity,
 ) : MahjongPlayerBase() {
 
     init {

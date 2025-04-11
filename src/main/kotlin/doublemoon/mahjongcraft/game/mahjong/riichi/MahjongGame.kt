@@ -27,6 +27,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mc.mian.lifesteal.api.PlayerImpl
 import net.minecraft.entity.Entity
+import net.minecraft.network.packet.CustomPayload
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld
@@ -919,8 +920,8 @@ class MahjongGame(
         }
         delayOnServer(3000) //玩家倒牌後小延遲一下, 再發送和局, 看起來比較自然
         realPlayers.forEach {  //寄送結算數據包以及分數列表
-            sendPayloadToPlayer(
-                player = it.entity,
+            sendPayloadToMJPlayer(
+                mjPlayer =  it,
                 payload = MahjongGamePayload(
                     behavior = MahjongGameBehavior.SCORE_SETTLEMENT,
                     extraData = Json.encodeToString(
@@ -947,8 +948,8 @@ class MahjongGame(
 
         realPlayers.forEach {
             // 寄送結算數據包以及分數列表
-            sendPayloadToPlayer(
-                player = it.entity,
+            sendPayloadToMJPlayer(
+                mjPlayer =  it,
                 payload = MahjongGamePayload(
                     behavior = MahjongGameBehavior.SCORE_SETTLEMENT,
                     extraData = Json.encodeToString(
@@ -1364,8 +1365,8 @@ class MahjongGame(
     ) {
         if (yakuSettlementList != null) {
             this.forEach { //發送給玩家役結算畫面的數據
-                sendPayloadToPlayer(
-                    player = it.entity,
+                sendPayloadToMJPlayer(
+                    mjPlayer =  it,
                     payload = MahjongGamePayload(
                         behavior = MahjongGameBehavior.YAKU_SETTLEMENT,
                         extraData = Json.encodeToString(yakuSettlementList)
@@ -1377,8 +1378,8 @@ class MahjongGame(
         }
         if (scoreSettlement != null) {
             this.forEach { //發送給玩家分數結算畫面的數據
-                sendPayloadToPlayer(
-                    player = it.entity,
+                sendPayloadToMJPlayer(
+                    mjPlayer =  it,
                     payload = MahjongGamePayload(
                         behavior = MahjongGameBehavior.SCORE_SETTLEMENT,
                         extraData = Json.encodeToString(scoreSettlement)
@@ -1401,33 +1402,64 @@ class MahjongGame(
         this.fragmentPayout = 0
 
         // Send GAME_OVER packet
-        sendPayloadToPlayer(
-            player = this.entity,
+        sendPayloadToMJPlayer(
+            mjPlayer =  this,
             payload = MahjongGamePayload(behavior = MahjongGameBehavior.GAME_OVER)
         )
     }
 
-    private fun playerGameOver(uuid: String, fragments: Int){
-        logger.warn("Trying to give $fragments fragments to $uuid")
+    // Send payload to MahjongPlayer (if online)
+    private fun sendPayloadToMJPlayer(mjPlayer: MahjongPlayer, payload: CustomPayload){
+        // Player is online + alive
+        if (mjPlayer.entity.networkHandler.isConnectionOpen && !mjPlayer.entity.isRemoved){
+            sendPayloadToPlayer(player = mjPlayer.entity, payload = payload)
+        }
+        // Player is disconnected / dead
+        else {
+            // Refresh ServerPlayerEntity (using UUID)
+            val serverWorld = this.world
+            if (!serverWorld.isClient) {
+                val server = serverWorld.server
+                server.execute {
+                    // Get the world instance safely on the main thread
+                    val worldOnMainThread = server.getWorld(serverWorld.registryKey)
+                    val player = worldOnMainThread?.getPlayerByUuid(mjPlayer.entity.uuid) as? ServerPlayerEntity
+                    // player was found
+                    if (player != null) {
+                        mjPlayer.entity = player
+                        sendPayloadToPlayer(player = mjPlayer.entity, payload = payload)
+                    }
+                }
+            }
+        }
+    }
 
+    // Send payload to UUID
+    private fun sendPayloadToUUID(uuid: String, payload: CustomPayload){
+        sendPayloadToUUID(UUID.fromString(uuid), payload)
+    }
+    private fun sendPayloadToUUID(uuid: UUID, payload: CustomPayload){
         val serverWorld = this.world
         if (!serverWorld.isClient) {
             val server = serverWorld.server
             server.execute {
                 // Get the world instance safely on the main thread
                 val worldOnMainThread = server.getWorld(serverWorld.registryKey)
-                val player = worldOnMainThread?.getPlayerByUuid( UUID.fromString(uuid) )
-                // Player might be offline
-                if (player !=null){
-                    val lsPlayer = player as PlayerImpl
-                    lsPlayer.giveFragments(fragments)
-                    logger.warn("GOOD?: $uuid")
+                val player = worldOnMainThread?.getPlayerByUuid(uuid) as? ServerPlayerEntity
+                // If player is online
+                if (player != null) {
+                    sendPayloadToPlayer(player = player, payload = payload)
                 }
             }
         }
     }
 
 
+    /**
+     * 擲骰,
+     * 並設定骰子點數 [dicePoints],
+     * 最後會回傳兩個骰子
+     * */
     private suspend fun rollDice(): List<DiceEntity> {
         val dices = List(2) {
             DiceEntity(
@@ -1532,8 +1564,8 @@ class MahjongGame(
             it.cancelWaitingBehavior = false
             val lsPlayer = it.entity as PlayerImpl
             lsPlayer.resetJonger() // remove wager (they have been exchanged for points)
-            sendPayloadToPlayer(
-                player = it.entity,
+            sendPayloadToMJPlayer(
+                mjPlayer =  it,
                 payload = MahjongGamePayload(behavior = MahjongGameBehavior.GAME_START)
             )
         }
@@ -1597,8 +1629,8 @@ class MahjongGame(
         clearStuffs()
         round = MahjongRound()
         distributeFragments()
-        //realPlayers.forEach { it.gameOver() }
-        realPlayers.forEach { playerGameOver(it.uuid, it.fragmentPayout) }
+        realPlayers.forEach { it.gameOver() }
+        //realPlayers.forEach { playerGameOver(it.uuid, it.fragmentPayout) }
 
         // Remove all players from game
         botPlayers.forEach { botPlayer -> removeEntity(botPlayer.entity, Entity.RemovalReason.DISCARDED) }
