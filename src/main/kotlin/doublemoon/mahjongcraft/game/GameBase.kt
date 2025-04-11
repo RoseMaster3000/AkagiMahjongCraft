@@ -91,7 +91,7 @@ interface GameBase<T : GamePlayer> {
      * 從 [players] 依照 [player] 取得 [T]
      * */
     fun getPlayer(player: ServerPlayerEntity): T? {
-        return players.find { it.entity == player }
+        return players.find { it.entity.uuid == player.uuid }
     }
 
     /**

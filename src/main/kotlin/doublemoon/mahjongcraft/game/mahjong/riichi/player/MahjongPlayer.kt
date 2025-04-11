@@ -34,6 +34,7 @@ class MahjongPlayer(
         entity.sendMessage(text, overlay)
     }
 
+    var fragmentPayout = 0;
     /**
      * 正在等待客戶端執行的動作
      * */

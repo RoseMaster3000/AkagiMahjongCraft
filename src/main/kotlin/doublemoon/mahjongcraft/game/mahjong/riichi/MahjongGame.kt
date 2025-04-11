@@ -25,8 +25,8 @@ import doublemoon.mahjongcraft.util.sendTitles
 import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import mc.mian.lifesteal.api.PlayerImpl
 import net.minecraft.entity.Entity
-import net.minecraft.entity.Entity.RemovalReason
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld
@@ -43,7 +43,9 @@ import net.minecraft.util.math.Vec3d
 import org.mahjong4j.PersonalSituation
 import org.mahjong4j.hands.Kantsu
 import kotlin.math.abs
-import mc.mian.lifesteal.api.PlayerImpl
+import kotlin.math.max
+import kotlin.math.roundToInt
+
 /**
  * 日本麻將的主要實現都在這, 允許食斷
  *
@@ -122,14 +124,30 @@ class MahjongGame(
      * 規則發生改變, 在等待中的已準備玩家, 除了 Bot 和 Host->全都取消準備, 並且發送訊息進行提示
      * */
     fun changeRules(rule: MahjongRule) {
+        // Verify Host Can afford new rule's buy in
+        val lsPlayer = players[0].entity as? PlayerImpl ?: return
+        val currentHealthBuyIn = this.rule.length.startingPoints / 9000
+        val nextHeartBuyIn = rule.length.startingPoints / 9000;
+        if (nextHeartBuyIn > currentHealthBuyIn){
+            if (!lsPlayer.hasHearts(nextHeartBuyIn-currentHealthBuyIn)){
+                return
+            }
+        }
+
+        // Set new game rule
         this.rule = rule
+
         players.forEachIndexed { index, mjPlayer ->
             if (mjPlayer is MahjongPlayer) {
+                // host -> buy in
                 if (index == 0) {
+                    buyIn(mjPlayer.entity)
                     mjPlayer.sendMessage(
                         text = PREFIX + Text.translatable("$MOD_ID.game.message.you_changed_the_rules")
                     )
+                // player -> unready
                 } else {
+                    buyOut(mjPlayer.entity)
                     mjPlayer.ready = false
                     mjPlayer.sendMessage(
                         text = PREFIX + Text.translatable("$MOD_ID.game.message.host_changed_the_rules")
@@ -152,27 +170,22 @@ class MahjongGame(
      * */
     fun readyOrNot(player: ServerPlayerEntity, ready: Boolean) {
         val currentPlayer = getPlayer(player) ?: return
-        currentPlayer.ready = ready
+        val playerImpl = player as? PlayerImpl
 
-
-        try {
-            val playerImpl = currentPlayer as PlayerImpl
-            if (ready) {
-                playerImpl.sendScreenMessage("You are a gambler")
-            }
-            else {
-                playerImpl.sendScreenMessage("You are a bitch")
-            }
-
-        } catch (e: LinkageError) {
-            // Catch errors if the Lifesteal mod/API isn't present or compatible
-            logger.warn("Lifesteal API interaction failed (LinkageError) for player ${player.name.string}. Is the Lifesteal mod installed and compatible? Error: ${e.message}")
-        } catch (e: Exception) {
-            // Catch other potential exceptions during API interaction
-            logger.error("Failed to send screen message via Lifesteal API for player ${player.name.string}: ${e.message}", e)
-            // You could add a fallback message to the player if desired:
-            // player.sendMessage(Text.literal("Error interacting with Lifesteal API."), false)
+        if (playerImpl == null){
+            currentPlayer.ready = false
+            return
         }
+        // ready -- buy in (try)
+        if (ready){
+            currentPlayer.ready = buyIn(player)
+        }
+        // unready -- buy out
+        else{
+            buyOut(player)
+            currentPlayer.ready = false
+        }
+
     }
 
     /**
@@ -182,6 +195,7 @@ class MahjongGame(
         if (index in players.indices) {
             val player = players.removeAt(index)
             if (player is MahjongPlayer) { //是玩家
+                buyOut(player.entity)
                 player.sendMessage(PREFIX + Text.translatable("$MOD_ID.game.message.be_kick"))
             } else {  //是機器人, 清掉實體
                 removeEntity(player.entity, Entity.RemovalReason.DISCARDED)
@@ -189,47 +203,75 @@ class MahjongGame(
         }
     }
 
-    /**
-     * 玩家加入,
-     * 不會重複加入
-     * */
-    override fun join(player: ServerPlayerEntity) {
-        if (GameManager.isInAnyGame(player) || isInGame(player)) return
-
-        players += MahjongPlayer(entity = player)
-        if (isHost(player)){
-            players[0].ready = true
-            try {
-                val lsPlayer = player as? PlayerImpl;
-                lsPlayer?.sendScreenMessage("You are a gambler")
-            } catch (e: LinkageError) {
-                logger.warn("Lifesteal API interaction failed (LinkageError) for player ${player.name.string}. Is the Lifesteal mod installed and compatible? Error: ${e.message}")
-            } catch (e: Exception) {
-                logger.error("Failed to send screen message via Lifesteal API for player ${player.name.string}: ${e.message}", e)
-            }
+    fun buyIn(player: ServerPlayerEntity): Boolean {
+        try {
+            val lsPlayer = player as? PlayerImpl ?: return false
+            val heartBuyIn = rule.length.startingPoints / 9000;
+            return lsPlayer.setJonger(heartBuyIn)
+        } catch (e: LinkageError) {
+            logger.warn("Lifesteal API interaction failed (LinkageError) for player ${player.name.string}. Is the Lifesteal mod installed and compatible? Error: ${e.message}")
+            return false
+        } catch (e: Exception) {
+            logger.error("Failed to send screen message via Lifesteal API for player ${player.name.string}: ${e.message}", e)
+            return false
         }
     }
 
-    /**
-     * 玩家離開,
-     * 目前只有離開伺服器或切換世界會自動離開 麻將遊戲,
-     * "沒有限制"超出範圍會離開 麻將遊戲
-     * */
+    fun buyOut(player: ServerPlayerEntity) {
+        try {
+            val lsPlayer = player as? PlayerImpl ?: return
+            lsPlayer.setJonger(0)
+        } catch (e: LinkageError) {
+            logger.warn("Lifesteal API interaction failed (LinkageError) for player ${player.name.string}. Is the Lifesteal mod installed and compatible? Error: ${e.message}")
+            return
+        } catch (e: Exception) {
+            logger.error("Failed to send screen message via Lifesteal API for player ${player.name.string}: ${e.message}", e)
+            return
+        }
+    }
+
+
+    override fun join(player: ServerPlayerEntity) {
+        if (GameManager.isInAnyGame(player) || isInGame(player)) return
+        players += MahjongPlayer(entity = player)
+
+        // Host immediately buys in + readys up
+        if (isHost(player)){
+            val success = buyIn(player)
+            // cant buy in? Immediately leave table
+            if (!success) {
+                leave(player)
+            }
+            else{
+                players[0].ready = true
+            }
+
+        }
+    }
+
+    //    * Player Exit,
+    //    * Currently only leaving a server or switching worlds will automatically exit a mahjong game,
+    //    * "No Limit" out of range will exit a mahjong game.
     override fun leave(player: ServerPlayerEntity) {
         if (!GameManager.isInAnyGame(player) || !isInGame(player)) return
-        if (isHost(player)) { //如果玩家是 host
-            players.find { it is MahjongPlayer && it.entity != player }.apply {
-                if (this != null) {
-                    players.remove(this)
-                    players.add(0, this)
-                    this.ready = true
-                } else {
-                    botPlayers.forEach { botPlayer -> removeEntity(botPlayer.entity, Entity.RemovalReason.DISCARDED) }
-                    players.clear()
-                }
+
+        // Did host leave
+        if (isHost(player)) {
+            // Force All Player To Buy Out
+            realPlayers.forEach { mahjongPlayer ->
+                buyOut(mahjongPlayer.entity)
             }
+
+            // Remove all players from game
+            botPlayers.forEach { botPlayer -> removeEntity(botPlayer.entity, Entity.RemovalReason.DISCARDED) }
+            players.clear()
         }
-        players.removeIf { it.entity == player }
+        // Random person left
+        else {
+            buyOut(player)
+            players.removeIf { it.entity == player }
+        }
+
     }
 
 
@@ -892,9 +934,7 @@ class MahjongGame(
         delayOnServer(ScoreSettleHandler.defaultTime * 1000L) //基本最少會等待跟結算畫面一樣長的秒數
     }
 
-    /**
-     * 顯示遊戲結果
-     * */
+    // Show Game Result Screen
     private fun showGameResult() {
         val scoreList = players.map {
             ScoreItem(
@@ -1349,14 +1389,18 @@ class MahjongGame(
         }
     }
 
-    /**
-     * 玩家收到遊戲結束的數據
-     * */
+    //Player receives end-of-game data
     private fun MahjongPlayer.gameOver() {
-        if (!isHost(this.entity)) ready = false //非 Host 玩家會取消準備
+        if (!isHost(this.entity)) ready = false
         cancelWaitingBehavior = true
 
-        // 對玩家發送 GAME_OVER 的數據包
+        // Hand over money / reset
+        val targetPlayer = world.server.playerManager.getPlayer(this.uuid);
+        val lsPlayer = targetPlayer as PlayerImpl
+        lsPlayer.giveFragments(this.fragmentPayout)
+        this.fragmentPayout = 0
+
+        // Send GAME_OVER packet
         sendPayloadToPlayer(
             player = this.entity,
             payload = MahjongGamePayload(behavior = MahjongGameBehavior.GAME_OVER)
@@ -1470,6 +1514,8 @@ class MahjongGame(
         }
         realPlayers.forEach {
             it.cancelWaitingBehavior = false
+            val lsPlayer = it.entity as PlayerImpl
+            lsPlayer.resetJonger() // remove wager (they have been exchanged for points)
             sendPayloadToPlayer(
                 player = it.entity,
                 payload = MahjongGamePayload(behavior = MahjongGameBehavior.GAME_START)
@@ -1484,35 +1530,63 @@ class MahjongGame(
         }
     }
 
+
+    // Hand out Heart Fragments (based on mahjong points / initial buy in)
+    private fun distributeFragments(){
+        val totalFragments = rule.length.startingPoints / 1000 * realPlayers.size
+        val totalEffectivePoints = realPlayers.sumOf { max(0, it.points) }
+        if (totalEffectivePoints==0) {return}
+        var remainingFragments = totalFragments;
+
+        // Calculate Ideal Shares and Initial Allocation based on effective points
+        for (player in realPlayers) {
+            val effectivePoints =  max(player.points, 0)
+            val fragments = effectivePoints.toDouble() / totalEffectivePoints.toDouble() * totalFragments.toDouble()
+            player.fragmentPayout = fragments.roundToInt()
+            remainingFragments -= player.fragmentPayout
+        }
+
+        // Wiggle out any weird rounding errors (give gems to top players / take gems from bottom players)
+        while (remainingFragments != 0) {
+            val bonusCandidate = realPlayers
+                .maxByOrNull { it.fragmentPayout }
+            val punishCandidate = realPlayers
+                .filter { it.fragmentPayout > 0 }
+                .minByOrNull { it.fragmentPayout }
+
+            if (remainingFragments > 0){
+                if (bonusCandidate == null) break
+                bonusCandidate.fragmentPayout += 1
+                remainingFragments -= 1
+            }
+            if (remainingFragments < 0) {
+                if (punishCandidate == null) break
+                punishCandidate.fragmentPayout -=1
+                remainingFragments += 1
+            }
+        }
+
+    }
+
     /**
-     * 結束遊戲,
-     * 請在主線程上調用
+     * End game, call on main thread!
      *
-     * @param sync 是否要同步 [MahjongTableBlockEntity]
+     * @param sync whether to sync with [MahjongTableBlockEntity]
      * */
     override fun end(sync: Boolean) {
-        //結束遊戲
         status = GameStatus.WAITING
         jobWaitForStart?.cancel()
         jobRound?.cancel()
         seat.clear()
         clearStuffs()
         round = MahjongRound()
+        distributeFragments()
         realPlayers.forEach { it.gameOver() }
-        botPlayers.forEach { //將電腦傳回原本的位置
-            it.entity.isInvisible = true
-            val serverWorld = it.entity.world as? ServerWorld
-            it.entity.teleport(
-                serverWorld,
-                tableCenterPos.x,
-                tableCenterPos.y,
-                tableCenterPos.z,
-                setOf(),
-                it.entity.yaw,
-                it.entity.pitch
-            )
-        }
-        if (sync) syncMahjongTable()  //結束遊戲要同步麻將桌
+        // Remove all players from game
+        botPlayers.forEach { botPlayer -> removeEntity(botPlayer.entity, Entity.RemovalReason.DISCARDED) }
+        players.clear()
+        // synchronize the mahjong table
+        if (sync) syncMahjongTable()
     }
 
     /**
@@ -1534,37 +1608,36 @@ class MahjongGame(
         GameManager.games -= this
     }
 
-    /**
-     * 有任何玩家離開遊戲時結束遊戲, 向玩家顯示有人離開遊戲
-     * */
+    // player disconnect... just let them keep "auto-discarding"
     override fun onPlayerDisconnect(player: ServerPlayerEntity) {
-        if (isPlaying) {
-            showGameResult()
-            end(sync = false)
-        }
-        leave(player)
-        val message = PREFIX + Text.translatable("$MOD_ID.game.message.player_left_game", player.displayName)
-        realPlayers.forEach { //傳給玩家-> [player] 離開遊戲的訊息
-            it.sendMessage(message)
-        }
-        syncMahjongTable() //有任何玩家離開遊戲時同步
+        val lsPlayer = player as PlayerImpl
+        lsPlayer.resetJonger()
+
+//        if (isPlaying) {
+//            showGameResult()
+//            end(sync = false)
+//        }
+//        leave(player)
+//        val message = PREFIX + Text.translatable("$MOD_ID.game.message.player_left_game", player.displayName)
+//        realPlayers.forEach { //傳給玩家-> [player] 離開遊戲的訊息
+//            it.sendMessage(message)
+//        }
+//        syncMahjongTable()
     }
 
-    /**
-     * 有任何玩家切換世界時結束遊戲, 向玩家顯示有人不在當前的世界
-     * */
+    // player change world... just let them keep "auto-discarding"/**
     override fun onPlayerChangedWorld(player: ServerPlayerEntity) {
-        if (isPlaying) {
-            showGameResult()
-            end(sync = false)
-        }
-        leave(player)
-        val message =
-            PREFIX + Text.translatable("$MOD_ID.game.message.player_is_not_in_this_world", player.displayName)
-        realPlayers.forEach {  //傳給玩家-> [player] 改變世界的訊息
-            it.sendMessage(message)
-        }
-        syncMahjongTable() //有任何玩家切換世界時同步
+        //if (isPlaying) {
+        //    showGameResult()
+        //    end(sync = false)
+        //}
+        //leave(player)
+        //val message =
+        //    PREFIX + Text.translatable("$MOD_ID.game.message.player_is_not_in_this_world", player.displayName)
+        //realPlayers.forEach {  //傳給玩家-> [player] 改變世界的訊息
+        //    it.sendMessage(message)
+        //}
+        //syncMahjongTable()
     }
 
     override fun onServerStopping(server: MinecraftServer) {

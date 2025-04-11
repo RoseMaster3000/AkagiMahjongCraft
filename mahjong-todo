@@ -1,12 +1,14 @@
-fun readyOrNot      non-host ready up (take hearts / GATEKEEP)
+
+fun join            host (take hearts / GATEKEEP)
+fun leave           host (refund hearts)
+
+fun readyOrNot      host     ready TRUE (take hearts / GATEKEEP)
+                    non-host ready FALSE (refund heart)
+
+
+fun changeRules     host (buy in /  GATEKEEP)
                     non-host ready down (refund heart)
 
-fun join
-    isHost          host (take hearts / GATEKEEP)
+fun start           ALL   void resetJonger();
 
-fun leave
-    isHost          host (take hearts)
-
-
-fun changeRules     host (take hearts / refund hearts / GATEKEEP)
-                    non-host ready down (refund heart)
+fun end             ALL   giveFragments(int count)
