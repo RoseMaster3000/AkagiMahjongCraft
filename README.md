@@ -7,12 +7,12 @@ A Fabric Minecraft mod that allows you to play Japanese (Riichi) Mahjong in game
 * Fixed conflict with c2me (thread unsafe entity removals were fixed)
 * Made tables indestructible if game is ongoing
 * Player disconnects DO NOT end the game, players can rejoin mahjong table
-* Player death is not buggy, players can rejoin mahjong table
+* Player deaths DO NOT bug out the game, players can rejoin mahjong table
 * Breaking a mahjong table drops a mahjong table
 * Removed call voice sound effects (we use proximity chat)
 * Replaced 1 sou with Philly Eagles (go birds)
 * Removed AI bots (ruins gambling) (might bring this back and just treat bots as 0 weight for cash out?)
-* Get players using UUID rather than ServerEntity instance (more robust)
+* server sends network payload with a wrapper methods which is more stable (checks if player has reconnected/died/etc)
 
 
 ## Lifesteal Gambling
