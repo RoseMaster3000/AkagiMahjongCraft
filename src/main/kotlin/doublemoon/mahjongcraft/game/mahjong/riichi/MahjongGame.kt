@@ -1428,11 +1428,6 @@ class MahjongGame(
     }
 
 
-    /**
-     * 擲骰,
-     * 並設定骰子點數 [dicePoints],
-     * 最後會回傳兩個骰子
-     * */
     private suspend fun rollDice(): List<DiceEntity> {
         val dices = List(2) {
             DiceEntity(
